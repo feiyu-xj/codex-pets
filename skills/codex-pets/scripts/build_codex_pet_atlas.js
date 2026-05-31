@@ -272,6 +272,15 @@ function groupComponentsBySourceRows(components) {
   return groups.map((group) => byX(group.items));
 }
 
+function sourceRowDiagnostics(components) {
+  return groupComponentsBySourceRows(components).map((row) => ({
+    count: row.length,
+    centerY: Math.round(row.reduce((sum, item) => sum + componentCenterY(item), 0) / row.length),
+    minX: Math.min(...row.map((item) => item.left)),
+    maxX: Math.max(...row.map((item) => item.left + item.width)),
+  }));
+}
+
 function pickRows(components) {
   const usableComponents = components.filter((c) => c.width >= 24 && c.height >= 24);
   const sourceRows = groupComponentsBySourceRows(usableComponents);
@@ -429,21 +438,68 @@ async function validateAtlas(file) {
   const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   let unusedNonTransparentCells = 0;
   let usedEmptyCells = 0;
+  let edgeTouchingUsedCells = 0;
+  let minUsedCellCoverage = 1;
+  let maxUsedCellCoverage = 0;
+  const cellArea = CELL_W * CELL_H;
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       let alphaSum = 0;
+      let alphaPixels = 0;
+      let edgePixels = 0;
       for (let y = r * CELL_H; y < (r + 1) * CELL_H; y++) {
         for (let x = c * CELL_W; x < (c + 1) * CELL_W; x++) {
-          alphaSum += data[(y * info.width + x) * 4 + 3];
+          const a = data[(y * info.width + x) * 4 + 3];
+          alphaSum += a;
+          if (a >= 8) {
+            alphaPixels++;
+            if (x === c * CELL_W || x === (c + 1) * CELL_W - 1 || y === r * CELL_H || y === (r + 1) * CELL_H - 1) {
+              edgePixels++;
+            }
+          }
         }
       }
       if (c >= ROW_COUNTS[r] && alphaSum > 0) unusedNonTransparentCells++;
       if (c < ROW_COUNTS[r] && alphaSum === 0) usedEmptyCells++;
+      if (c < ROW_COUNTS[r]) {
+        const coverage = alphaPixels / cellArea;
+        minUsedCellCoverage = Math.min(minUsedCellCoverage, coverage);
+        maxUsedCellCoverage = Math.max(maxUsedCellCoverage, coverage);
+        if (edgePixels > 0) edgeTouchingUsedCells++;
+      }
     }
   }
 
-  return { width: info.width, height: info.height, unusedNonTransparentCells, usedEmptyCells };
+  return {
+    width: info.width,
+    height: info.height,
+    unusedNonTransparentCells,
+    usedEmptyCells,
+    edgeTouchingUsedCells,
+    minUsedCellCoverage: Number(minUsedCellCoverage.toFixed(4)),
+    maxUsedCellCoverage: Number(maxUsedCellCoverage.toFixed(4)),
+  };
+}
+
+async function atlasDiagnostics(file, sourceRows, components) {
+  const validation = await validateAtlas(file);
+  const warnings = [];
+  if (sourceRows.length < 7) warnings.push(`Only ${sourceRows.length} source rows detected; prompt may need stricter row spacing.`);
+  if (components.length < 32) warnings.push(`Only ${components.length} usable components detected; some poses may be reused heavily.`);
+  if (validation.edgeTouchingUsedCells > 0) warnings.push(`${validation.edgeTouchingUsedCells} used cells touch cell edges; source poses or props may be too wide/tall.`);
+  if (validation.minUsedCellCoverage < 0.03) warnings.push("At least one used cell has very low coverage; a source pose may be tiny or incomplete.");
+  if (validation.maxUsedCellCoverage > 0.48) warnings.push("At least one used cell is very dense; inspect for oversized props or cropped silhouettes.");
+
+  return {
+    validation,
+    diagnostics: {
+      sourceComponentCount: components.length,
+      sourceRowCount: sourceRows.length,
+      sourceRows,
+      warnings,
+    },
+  };
 }
 
 async function normalizeTransparentPixels(file) {
@@ -472,6 +528,7 @@ async function main() {
 
   const meta = await removeConnectedBackground(args.source, transparentSource, args.background || "auto");
   const components = await findComponents(transparentSource);
+  const sourceRows = sourceRowDiagnostics(components);
   const rowDefs = pickRows(components);
   const clarity = args.clarity === "crisp" ? "crisp" : "pixel";
 
@@ -521,7 +578,8 @@ async function main() {
     fs.writeFileSync(path.join(args["out-dir"], "pet.json"), JSON.stringify(petJson, null, 2) + "\n");
   }
 
-  console.log(JSON.stringify({ webp: atlasWebp, backgroundMode: meta.backgroundMode, validation: await validateAtlas(atlasWebp) }, null, 2));
+  const analysis = await atlasDiagnostics(atlasWebp, sourceRows, components);
+  console.log(JSON.stringify({ webp: atlasWebp, backgroundMode: meta.backgroundMode, ...analysis }, null, 2));
 }
 
 main().catch((err) => {

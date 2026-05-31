@@ -43,6 +43,8 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
 4. Validate before finishing.
    - Confirm `spritesheet.webp` is `1536x1872`.
    - Confirm unused cells are fully transparent.
+   - Read the build JSON diagnostics: `sourceComponentCount`, `sourceRowCount`, `sourceRows`, cell coverage, and `warnings`.
+   - Treat diagnostics warnings as a cue to inspect or regenerate the source, especially when source rows are missing, cells touch frame edges, or a used cell has very low coverage.
    - Visually inspect the atlas for cropped characters, checkerboard residue, white edge residue, and rows that do not match the intended state.
    - If a preview shows large colored blocks but validation reports transparent unused cells, inspect `spritesheet.png`; hidden RGB on transparent pixels may be normalized already and not visible in the app.
 
@@ -50,6 +52,7 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
    - Only do this after the user explicitly asks for an upload zip or confirms they want one.
    - Use `scripts/package_pet_zip.ps1`.
    - The zip root must contain exactly `pet.json` and `spritesheet.webp`.
+   - The packager rewrites `pet.json` as UTF-8 without BOM so strict upload validators do not reject it.
    - Keep the zip under `5MB`.
 
 ## Row Contract
