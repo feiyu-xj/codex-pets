@@ -49,9 +49,19 @@ function isGreenBackgroundPixel(r, g, b, a) {
   return g > 90 && g > r * 1.35 && g > b * 1.25;
 }
 
+function isMagentaBackgroundPixel(r, g, b, a) {
+  if (a < 8) return true;
+  return r > 120 && b > 100 && r > g * 1.45 && b > g * 1.35;
+}
+
 function isGreenResiduePixel(r, g, b, a) {
   if (a < 8) return true;
   return g > 45 && g > r * 1.15 && g > b * 1.08 && (g - r > 8 || g - b > 8);
+}
+
+function isMagentaResiduePixel(r, g, b, a) {
+  if (a < 8) return true;
+  return r > 70 && b > 60 && r > g * 1.18 && b > g * 1.12 && (r - g > 10 || b - g > 10);
 }
 
 function sampleBackgroundMode(data, info, requestedMode) {
@@ -62,8 +72,10 @@ function sampleBackgroundMode(data, info, requestedMode) {
   const total = w * h;
   let alphaPixels = 0;
   let greenPixels = 0;
+  let magentaPixels = 0;
   let lightPixels = 0;
   let borderGreen = 0;
+  let borderMagenta = 0;
   let borderLight = 0;
   let borderCount = 0;
 
@@ -75,6 +87,7 @@ function sampleBackgroundMode(data, info, requestedMode) {
     const a = data[i + 3];
     if (a < 245) alphaPixels++;
     if (isGreenBackgroundPixel(r, g, b, a)) greenPixels++;
+    if (isMagentaBackgroundPixel(r, g, b, a)) magentaPixels++;
     if (isLightCheckerPixel(r, g, b, a)) lightPixels++;
   }
 
@@ -85,12 +98,14 @@ function sampleBackgroundMode(data, info, requestedMode) {
       const i = (y * w + x) * 4;
       borderCount++;
       if (isGreenBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) borderGreen++;
+      if (isMagentaBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) borderMagenta++;
       if (isLightCheckerPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) borderLight++;
     }
   }
 
   if (alphaPixels / total > 0.2) return "alpha";
   if (borderGreen / borderCount > 0.45 || greenPixels / total > 0.2) return "green";
+  if (borderMagenta / borderCount > 0.45 || magentaPixels / total > 0.2) return "magenta";
   if (borderLight / borderCount > 0.45 || lightPixels / total > 0.25) return "checker";
   return "border";
 }
@@ -98,8 +113,9 @@ function sampleBackgroundMode(data, info, requestedMode) {
 function isBackgroundPixelForMode(r, g, b, a, mode) {
   if (a < 8) return true;
   if (mode === "green") return isGreenBackgroundPixel(r, g, b, a);
+  if (mode === "magenta") return isMagentaBackgroundPixel(r, g, b, a);
   if (mode === "checker") return isLightCheckerPixel(r, g, b, a);
-  return isLightCheckerPixel(r, g, b, a) || isGreenBackgroundPixel(r, g, b, a);
+  return isLightCheckerPixel(r, g, b, a) || isGreenBackgroundPixel(r, g, b, a) || isMagentaBackgroundPixel(r, g, b, a);
 }
 
 async function removeConnectedBackground(source, outFile, requestedMode = "auto") {
@@ -154,8 +170,10 @@ async function removeConnectedBackground(source, outFile, requestedMode = "auto"
 
   for (let p = 0; p < w * h; p++) {
     const i = p * 4;
-    const globallyRemovableGreen = mode === "green" && isGreenBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3]);
-    if (!seen[p] && !globallyRemovableGreen) continue;
+    const globallyRemovableChroma =
+      (mode === "green" && isGreenBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) ||
+      (mode === "magenta" && isMagentaBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3]));
+    if (!seen[p] && !globallyRemovableChroma) continue;
     data[i] = 0;
     data[i + 1] = 0;
     data[i + 2] = 0;
@@ -329,6 +347,7 @@ async function cleanSpriteEdges(buffer) {
     const i = idx * 4;
     if (data[i + 3] < 20) return true;
     if (isGreenResiduePixel(data[i], data[i + 1], data[i + 2], data[i + 3])) return true;
+    if (isMagentaResiduePixel(data[i], data[i + 1], data[i + 2], data[i + 3])) return true;
     const max = Math.max(data[i], data[i + 1], data[i + 2]);
     const min = Math.min(data[i], data[i + 1], data[i + 2]);
     const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
@@ -384,17 +403,19 @@ async function extractSprite(source, crop, meta, mirror = false) {
   return cleanSpriteEdges(await img.png().toBuffer());
 }
 
-async function placeFrame(inputBuffer, row, col, offset = { x: 0, y: 0 }) {
+async function placeFrame(inputBuffer, row, col, offset = { x: 0, y: 0 }, clarity = "pixel") {
   const meta = await sharp(inputBuffer).metadata();
   const maxW = row === 5 ? 170 : 150;
   const maxH = row === 5 ? 104 : 158;
   const scale = Math.min(1, maxW / meta.width, maxH / meta.height);
   const width = Math.max(1, Math.round(meta.width * scale));
   const height = Math.max(1, Math.round(meta.height * scale));
-  const resized = await sharp(inputBuffer)
-    .resize(width, height, { fit: "contain", kernel: sharp.kernel.nearest })
-    .png()
-    .toBuffer();
+  const kernel = clarity === "crisp" ? sharp.kernel.lanczos3 : sharp.kernel.nearest;
+  let resizedImage = sharp(inputBuffer).resize(width, height, { fit: "contain", kernel });
+  if (clarity === "crisp") {
+    resizedImage = resizedImage.sharpen({ sigma: 0.6 });
+  }
+  const resized = await resizedImage.png().toBuffer();
 
   return {
     input: resized,
@@ -451,6 +472,7 @@ async function main() {
   const meta = await removeConnectedBackground(args.source, transparentSource, args.background || "auto");
   const components = await findComponents(transparentSource);
   const rowDefs = pickRows(components);
+  const clarity = args.clarity === "crisp" ? "crisp" : "pixel";
 
   for (let r = 0; r < ROWS; r++) {
     if (!rowDefs[r] || rowDefs[r].length < ROW_COUNTS[r]) {
@@ -480,7 +502,7 @@ async function main() {
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < ROW_COUNTS[row]; col++) {
       const sprite = await extractSprite(transparentSource, rowDefs[row][col], meta, false);
-      overlays.push(await placeFrame(sprite, row, col, rowOffsets[row]?.[col]));
+      overlays.push(await placeFrame(sprite, row, col, rowOffsets[row]?.[col], clarity));
     }
   }
 

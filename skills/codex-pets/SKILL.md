@@ -30,9 +30,10 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
 
 2. Repair and convert the source sheet.
    - Use `scripts/build_codex_pet_atlas.js` when the generated sheet has many separated poses similar to the Rin Chibi workflow.
-   - The script analyzes the source and chooses a background strategy automatically: `alpha`, `green`, `checker`, or border-connected cleanup.
+   - The script analyzes the source and chooses a background strategy automatically: `alpha`, `green`, `magenta`, `checker`, or border-connected cleanup.
    - The script extracts pose components, clusters source poses into rows by actual vertical position, fills missing row frames by reusing nearby suitable poses, arranges them into the Codex 8x9 atlas, clears unused cells, normalizes transparent RGB values, and writes `spritesheet.webp`.
-   - Use `--background green`, `--background checker`, or `--background alpha` only when auto mode picks the wrong strategy.
+   - Use `--background green`, `--background magenta`, `--background checker`, or `--background alpha` only when auto mode picks the wrong strategy.
+   - Use `--clarity crisp` for cleaner downscaling on smooth generated sticker art; use `--clarity pixel` when preserving chunky pixel-art edges matters more.
 
 3. Install the pet.
    - Put `pet.json` and `spritesheet.webp` under `${CODEX_HOME:-$HOME/.codex}/pets/<pet-id>/`.
@@ -65,7 +66,8 @@ Build an atlas from a generated source sheet:
   --pet-id rin-chibi `
   --display-name "Rin Chibi" `
   --description "An original chibi mage-girl Codex pet." `
-  --background auto
+  --background auto `
+  --clarity crisp
 ```
 
 After user confirmation, create an upload zip:
