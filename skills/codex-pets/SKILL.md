@@ -31,7 +31,7 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
 2. Repair and convert the source sheet.
    - Use `scripts/build_codex_pet_atlas.js` when the generated sheet has many separated poses similar to the Rin Chibi workflow.
    - The script analyzes the source and chooses a background strategy automatically: `alpha`, `green`, `checker`, or border-connected cleanup.
-   - The script extracts pose components, fills missing row frames by reusing nearby suitable poses, arranges them into the Codex 8x9 atlas, clears unused cells, normalizes transparent RGB values, and writes `spritesheet.webp`.
+   - The script extracts pose components, clusters source poses into rows by actual vertical position, fills missing row frames by reusing nearby suitable poses, arranges them into the Codex 8x9 atlas, clears unused cells, normalizes transparent RGB values, and writes `spritesheet.webp`.
    - Use `--background green`, `--background checker`, or `--background alpha` only when auto mode picks the wrong strategy.
 
 3. Install the pet.

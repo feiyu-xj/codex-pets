@@ -49,6 +49,11 @@ function isGreenBackgroundPixel(r, g, b, a) {
   return g > 90 && g > r * 1.35 && g > b * 1.25;
 }
 
+function isGreenResiduePixel(r, g, b, a) {
+  if (a < 8) return true;
+  return g > 45 && g > r * 1.15 && g > b * 1.08 && (g - r > 8 || g - b > 8);
+}
+
 function sampleBackgroundMode(data, info, requestedMode) {
   if (requestedMode && requestedMode !== "auto") return requestedMode;
 
@@ -222,35 +227,76 @@ function byX(items) {
   return items.slice().sort((a, b) => a.left - b.left);
 }
 
+function componentCenterY(component) {
+  return component.top + component.height / 2;
+}
+
+function groupComponentsBySourceRows(components) {
+  const usableComponents = components.filter((c) => c.width >= 24 && c.height >= 24);
+  const sorted = usableComponents
+    .slice()
+    .sort((a, b) => componentCenterY(a) - componentCenterY(b) || a.left - b.left);
+  const groups = [];
+  const rowGap = 80;
+
+  for (const component of sorted) {
+    const centerY = componentCenterY(component);
+    const previous = groups[groups.length - 1];
+    if (!previous || centerY - previous.centerY > rowGap) {
+      groups.push({ centerY, items: [component] });
+    } else {
+      previous.items.push(component);
+      previous.centerY =
+        previous.items.reduce((sum, item) => sum + componentCenterY(item), 0) / previous.items.length;
+    }
+  }
+
+  return groups.map((group) => byX(group.items));
+}
+
 function pickRows(components) {
   const usableComponents = components.filter((c) => c.width >= 24 && c.height >= 24);
+  const sourceRows = groupComponentsBySourceRows(usableComponents);
   const band = (minY, maxY) => byX(usableComponents.filter((c) => c.top >= minY && c.top < maxY));
-  const top = band(0, 240);
-  const magic = band(240, 450);
-  const walkRight = band(450, 625);
-  const walkLeft = band(625, 790);
-  const sit = band(790, 985);
-  const sleep = band(985, 1145);
+  const top = sourceRows[0] || band(0, 240);
+  const action = sourceRows[1] || band(240, 450);
+  const walkRight = sourceRows[2] || band(450, 625);
+  const walkLeft = sourceRows[3] || band(625, 790);
+  const sit = sourceRows[4] || band(790, 985);
+  const sleep = sourceRows[5] || band(985, 1145);
+  const back = sourceRows[6] || sit;
+  const work = sourceRows[7] || action;
 
-  const frontFallback = [...top, ...sit, ...magic];
+  const frontFallback = [...top, ...sit, ...action];
   const sideFallback = [...walkRight, ...walkLeft, ...top];
   const sleepFallback = [...sleep, ...sit, ...top];
+  const backFallback = [...back, ...top, ...sit];
+  const workFallback = [...work, ...action, ...sit, ...top];
 
   const rows = [
     top.slice(0, 6),
     [...walkRight, walkRight[0]].slice(0, 8),
     [...walkLeft, walkLeft[0]].slice(0, 8),
     [top[0], top[4], top[5], top[4]],
-    [sit[1], sit[4], sit[5], sit[4], sit[1]],
+    [sit[0], sit[1], sit[2], sit[3], sit[4]],
     [...sleep, sit[4], sleep[2], sleep[4]].slice(0, 8),
-    sit.slice(0, 6),
-    magic.slice(0, 6),
-    [sit[3], sit[2], sit[4], sit[3], sit[2], sit[4]],
+    back.slice(0, 6),
+    work.slice(0, 6),
+    [work[0], work[1], work[2], action[0], action[1], action[2]],
   ];
 
   return rows.map((row, rowIndex) => {
     const usable = row.filter(Boolean);
-    const fallback = rowIndex === 1 || rowIndex === 2 ? sideFallback : rowIndex === 5 ? sleepFallback : frontFallback;
+    const fallback =
+      rowIndex === 1 || rowIndex === 2
+        ? sideFallback
+        : rowIndex === 5
+          ? sleepFallback
+          : rowIndex === 6
+            ? backFallback
+            : rowIndex === 7 || rowIndex === 8
+              ? workFallback
+              : frontFallback;
     for (const candidate of fallback) {
       if (usable.length >= ROW_COUNTS[rowIndex]) break;
       if (candidate) usable.push(candidate);
@@ -282,7 +328,7 @@ async function cleanSpriteEdges(buffer) {
   const isOuterResidue = (idx) => {
     const i = idx * 4;
     if (data[i + 3] < 20) return true;
-    if (isGreenBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) return true;
+    if (isGreenResiduePixel(data[i], data[i + 1], data[i + 2], data[i + 3])) return true;
     const max = Math.max(data[i], data[i + 1], data[i + 2]);
     const min = Math.min(data[i], data[i + 1], data[i + 2]);
     const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
