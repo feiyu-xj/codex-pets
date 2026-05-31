@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Pets"
+  short_description: "Create, refine, and optionally package Codex pets"
+  default_prompt: "Create or refine a standard Codex desktop pet spritesheet, then optionally package it for upload after confirmation."
