@@ -336,12 +336,13 @@ function clampCrop(crop, meta) {
   return rect(left, top, right - left, bottom - top);
 }
 
-async function cleanSpriteEdges(buffer) {
+async function cleanSpriteEdges(buffer, backgroundMode) {
   const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const w = info.width;
   const h = info.height;
   const originalAlpha = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) originalAlpha[i] = data[i * 4 + 3];
+  const shouldRemoveLightResidue = backgroundMode === "checker" || backgroundMode === "border";
 
   const isOuterResidue = (idx) => {
     const i = idx * 4;
@@ -351,7 +352,7 @@ async function cleanSpriteEdges(buffer) {
     const max = Math.max(data[i], data[i + 1], data[i + 2]);
     const min = Math.min(data[i], data[i + 1], data[i + 2]);
     const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    return max - min < 18 && avg > 238;
+    return shouldRemoveLightResidue && max - min < 18 && avg > 238;
   };
 
   const seen = new Uint8Array(w * h);
@@ -400,7 +401,7 @@ async function extractSprite(source, crop, meta, mirror = false) {
   const extracted = await sharp(source).extract(safeCrop).png().toBuffer();
   let img = sharp(extracted).trim({ background: "#00000000" });
   if (mirror) img = img.flop();
-  return cleanSpriteEdges(await img.png().toBuffer());
+  return cleanSpriteEdges(await img.png().toBuffer(), meta.backgroundMode);
 }
 
 async function placeFrame(inputBuffer, row, col, offset = { x: 0, y: 0 }, clarity = "pixel") {

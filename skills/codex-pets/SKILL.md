@@ -34,6 +34,7 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
    - The script extracts pose components, clusters source poses into rows by actual vertical position, fills missing row frames by reusing nearby suitable poses, arranges them into the Codex 8x9 atlas, clears unused cells, normalizes transparent RGB values, and writes `spritesheet.webp`.
    - Use `--background green`, `--background magenta`, `--background checker`, or `--background alpha` only when auto mode picks the wrong strategy.
    - Use `--clarity crisp` for cleaner downscaling on smooth generated sticker art; use `--clarity pixel` when preserving chunky pixel-art edges matters more.
+   - White/light subject pixels are preserved on chroma backgrounds; broad light-pixel cleanup is only for checker/border cleanup so white mascots and white clothes are not erased.
 
 3. Install the pet.
    - Put `pet.json` and `spritesheet.webp` under `${CODEX_HOME:-$HOME/.codex}/pets/<pet-id>/`.
