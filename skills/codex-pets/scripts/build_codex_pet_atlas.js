@@ -282,6 +282,7 @@ async function cleanSpriteEdges(buffer) {
   const isOuterResidue = (idx) => {
     const i = idx * 4;
     if (data[i + 3] < 20) return true;
+    if (isGreenBackgroundPixel(data[i], data[i + 1], data[i + 2], data[i + 3])) return true;
     const max = Math.max(data[i], data[i + 1], data[i + 2]);
     const min = Math.min(data[i], data[i + 1], data[i + 2]);
     const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
