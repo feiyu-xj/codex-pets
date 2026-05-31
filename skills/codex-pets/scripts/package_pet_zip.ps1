@@ -23,7 +23,10 @@ $stage = Join-Path ([System.IO.Path]::GetTempPath()) ("codex-pet-zip-" + [System
 New-Item -ItemType Directory -Force $stage | Out-Null
 
 try {
-  Copy-Item -Force $petJson (Join-Path $stage "pet.json")
+  $petJsonObject = Get-Content -Raw $petJson | ConvertFrom-Json
+  $petJsonText = $petJsonObject | ConvertTo-Json -Depth 10
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText((Join-Path $stage "pet.json"), ($petJsonText + "`n"), $utf8NoBom)
   Copy-Item -Force $spritesheet (Join-Path $stage "spritesheet.webp")
 
   $parent = Split-Path -Parent $OutZip
