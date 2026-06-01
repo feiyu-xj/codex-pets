@@ -26,6 +26,7 @@ When creating character-inspired pets, make an original chibi/cartoon interpreta
    - Ask for separated full-body poses with generous spacing.
    - Include idle, walking right, walking left, waving/hover greeting, jumping, failed/sleeping, waiting, working, and review/thinking poses.
    - Vary poses according to the character: mages can cast, read, hold crystals, meditate, sleep, and review; warriors can guard, ready weapons, train, rest, and inspect; animals can sit, trot, paw-wave, curl up, sniff, and listen.
+   - For known character-inspired pets, make rows 2, 5, 6, and 8 reflect the character's story, combat style, habits, props, and personality instead of using generic actions.
    - Request no text, no watermark, no scenery, no visible grid, no shadows, and no pose overlap.
 
 2. Repair and convert the source sheet.
