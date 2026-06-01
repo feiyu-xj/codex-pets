@@ -36,6 +36,9 @@ Match the action row and working/review rows to the character:
 - Warrior: guard stance, weapon ready, salute, inspect weapon, rest.
 - Student/scholar: read, write, laptop/book, think, ask for help.
 - Animal/mascot: sit, trot, paw-wave, curl up, sniff, perk ears, sleep.
+- Non-human mascot: keep body proportions consistent, animate ears/tails/antennae as the main motion, use crawling/trotting/hopping instead of human walking when appropriate, and keep oversized ears, hats, tails, wings, or round bodies inside each pose area.
+- For very round or tiny mascot bodies, ask for slightly larger source poses with extra blank spacing; this gives the converter enough detail while preventing hats, ears, tails, or props from touching the Codex cell edges.
+- For highly recognizable franchise mascots, describe an original archetype with broad traits and signature action language instead of asking for a direct official copy.
 - Musician/artist: hold instrument/tool, sketch, listen, practice, bow.
 - Ninja/assassin: hand signs, crouched landing, sprint start, scroll reading, tool-ready pose, exhausted training rest.
 - Swordsman: draw stance, guard, blade inspection, polishing, breathing/focus pose, respectful kneel.
